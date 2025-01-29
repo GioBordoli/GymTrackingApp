@@ -9,13 +9,25 @@ import SwiftUI
 import AVFoundation
 
 struct ContentView: View {
+    
+    // Tracks whether we are currently recording
     @State private var isRecording = false
+    
+    // AVAudioRecorder to capture our audio
     @State private var recorder: AVAudioRecorder?
+    
+    // AVAudioPlayer to play back our audio
+    @State private var audioPlayer: AVAudioPlayer?
+    
+    // Holds the URL where we save the recording
     @State private var audioFilename: URL?
+    
+    // For displaying status messages in the UI
     @State private var message = ""
     
     var body: some View {
         VStack {
+            
             // Title
             Text("GymTrackApp")
                 .font(.largeTitle)
@@ -27,7 +39,7 @@ struct ContentView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .padding()
 
-            // Record button
+            // Record/Stop button
             Button(action: {
                 if isRecording {
                     stopRecording()
@@ -44,8 +56,8 @@ struct ContentView: View {
             }
             .padding()
 
+            /*
             // Send to Server button (commented out for now)
-/*
             Button(action: sendToServer) {
                 Text("Send to Server")
                     .padding()
@@ -55,7 +67,7 @@ struct ContentView: View {
                     .cornerRadius(10)
             }
             .padding()
-*/
+            */
 
             // Message Display
             Text(message)
@@ -65,11 +77,16 @@ struct ContentView: View {
         .padding()
     }
     
+    /// Starts an audio recording session and writes to "recording.m4a".
     func startRecording() {
+        
+        // Get the app’s Documents directory
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        
+        // Create or use the "recordings" folder
         let recordingsFolder = documentsPath.appendingPathComponent("recordings")
         
-        // Create the recordings folder if needed
+        // Create the "recordings" directory if it doesn't exist
         if !FileManager.default.fileExists(atPath: recordingsFolder.path) {
             do {
                 try FileManager.default.createDirectory(at: recordingsFolder,
@@ -81,10 +98,10 @@ struct ContentView: View {
             }
         }
         
-        // Audio file path
+        // Determine the file path: Documents/recordings/recording.m4a
         audioFilename = recordingsFolder.appendingPathComponent("recording.m4a")
         
-        // Configure AVAudioSession
+        // Configure our audio session for both playback and recording
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playAndRecord, mode: .default)
@@ -94,18 +111,21 @@ struct ContentView: View {
             return
         }
         
-        // Start recording
+        // Make sure we have a valid URL to save to
         guard let audioFilename = audioFilename else {
             message = "Audio filename not set."
             return
         }
-        let settings = [
+        
+        // Define settings for the recording (AAC, 44100 Hz, etc.)
+        let settings: [String : Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: 44100,
             AVNumberOfChannelsKey: 2,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ] as [String : Any]
+        ]
         
+        // Attempt to create and start the AVAudioRecorder
         do {
             recorder = try AVAudioRecorder(url: audioFilename, settings: settings)
             recorder?.record()
@@ -116,21 +136,50 @@ struct ContentView: View {
         }
     }
     
+    /// Stops the recording, updates the UI, and immediately plays it back.
     func stopRecording() {
+        // Stop the AVAudioRecorder
         recorder?.stop()
         isRecording = false
-        message = "Audio recorded successfully"
         
-        // Print the file path to confirm it's saved
+        // Update our message label
+        message = "Audio recorded successfully."
+        
+        // Print the file path to the Xcode console
         if let path = audioFilename?.path {
             print("Audio file saved to: \(path)")
         }
+        
+        // As a quick test, let's immediately play back the recording:
+        playRecording()
     }
     
-    // Commented out for now
+    /// Attempts to play the recorded audio file once available.
+    func playRecording() {
+        // Ensure we have a valid file URL
+        guard let fileURL = audioFilename else {
+            print("No audio file URL available.")
+            return
+        }
+        
+        do {
+            // Create the AVAudioPlayer using that file URL
+            audioPlayer = try AVAudioPlayer(contentsOf: fileURL)
+            
+            // Prepare and play the audio
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.play()
+            
+            message = "Playing back recording..."
+        } catch {
+            message = "Failed to play audio: \(error.localizedDescription)"
+        }
+    }
+    
     /*
+    // We'll implement this later when hooking up to our backend
     func sendToServer() {
-        // We'll handle this later once we're sure recording works
+        message = "Audio saved to recordings folder!"
     }
     */
 }
